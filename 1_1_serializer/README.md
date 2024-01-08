@@ -47,7 +47,9 @@
 ```
 git clone https://github.com/t1msi/fpga_lab_1.git
 cd fpga_lab_1/1_1_serializer/tb/
-vsim -c -do make.tcl
+vsim&
+
+do make.tcl
 
 ```
 
