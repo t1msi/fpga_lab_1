@@ -20,25 +20,27 @@ else if (data_mod_i == 4'b0001 || data_mod_i == 4'b0010) data_mod_i_copy = 4'b00
 else                                                     data_mod_i_copy = data_mod_i;
 
 
-always_ff @( posedge clk_i )
+always_ff @( posedge clk_i or posedge srst_i )
   begin
-    if ( srst_i || !data_val_i || mod_counter == data_mod_i_copy ) begin
-	  mod_counter <= 1'b0;
-	end else begin
-	  mod_counter <= mod_counter + 1;
-	end
+    if ( srst_i ) begin
+      mod_counter <= 1'b0;
+      ser_data_val_o <= 1'b0;
+    end
+    else if ( data_val_i ) begin
+      mod_counter <= 1'b0;
+      ser_data_val_o <= 1'b1;
+    end 
+    else if ( mod_counter == data_mod_i_copy ) begin
+	    mod_counter <= 1'b0;
+      ser_data_val_o <= 1'b0;
+	  end
+    else if ( ser_data_val_o ) begin
+	    mod_counter <= mod_counter + 1;
+      ser_data_val_o <= 1'b1;
+	  end
   end
 
-always_comb begin
-  if ( srst_i || !data_val_i || mod_counter == data_mod_i_copy ) begin
-      ser_data_o = 1'b0;
-	  ser_data_val_o = 1'b0;
-	  busy_o = 1'b0;
-    end else begin
-    ser_data_o = data_i[16 - mod_counter - 1];
-    ser_data_val_o = 1'b1;
-    busy_o = 1'b1;
-  end
-end
+  assign ser_data_o = (ser_data_val_o) ? data_i[16 - mod_counter - 1] : 1'b0;
+  assign busy_o = data_val_i || ser_data_val_o;
 
 endmodule
