@@ -1,16 +1,16 @@
 module tb;
 
-bit clk;
-bit rst;
-bit rst_done;
+bit          clk;
+bit          rst;
+bit          rst_done;
 
-bit [15:0] data_i_var;
-bit [3:0]  data_i_len;
-logic      ser_data_i_val;
+logic [15:0] data_i_var;
+logic [3:0]  data_i_len;
+logic        ser_data_i_val;
 
-logic ser_data;
-logic ser_data_val;
-logic ser_data_en;
+logic        ser_data;
+logic        ser_data_val;
+logic        ser_data_en;
 
 always #5ns clk = !clk;
 
@@ -34,28 +34,32 @@ initial begin
   rst_done = 1'b1;
 end
 
-initial begin
-  wait(rst_done);
+initial
+  begin
+    wait(rst_done);
+    
+    ser_data_i_val = 0;
   
-  ser_data_i_val = 0;
-
-  for (int i = 0; i <= 15; i++)
-    for (int j = 0; j <= 16'hffff; j++ ) begin
-      
-      @(posedge clk) begin
-        wait(!ser_data_en);
-        data_i_var <= j;
-        data_i_len <= i;
-        ser_data_i_val <= 1'b1;
-      end      
-
-      @( posedge clk ) begin
-        ser_data_i_val <= 1'b0;
-      end
-    end
-
-  $stop();
-
-end
+    for ( int i = 0; i <= 4'b1111; i++ )
+      for (int j = 0; j <= 16'hffff; j++ )
+        begin
+          
+          @(posedge clk)
+            begin
+              wait(!ser_data_en);
+              data_i_var     <= j;
+              data_i_len     <= i;
+              ser_data_i_val <= 1'b1;
+            end      
+    
+          @( posedge clk )
+            begin
+              ser_data_i_val <= 1'b0;
+            end
+        end
+  
+    $stop();
+  
+  end
 
 endmodule
