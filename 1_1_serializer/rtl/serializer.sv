@@ -1,14 +1,14 @@
 module serializer (
-  input               clk_i,           // Тактовый сигнал
-  input               srst_i,          // Синхронный сброс
+  input               clk_i,           // Clock signal
+  input               srst_i,          // Syncronous reset
 	
-  input logic [15:0]  data_i,          // Входные данные
-  input logic [3:0]   data_mod_i,      // Кол-во валидных бит
-  input logic         data_val_i,      // Подтверждение валидности input
+  input logic [15:0]  data_i,          // Input data
+  input logic [3:0]   data_mod_i,      // Quantity of valid bit
+  input logic         data_val_i,      // Confirmation of input
   
-  output logic        ser_data_o,      // Сериализованные данные
-  output logic        ser_data_val_o,  // Подтверждение валидности output
-  output logic        busy_o           // Модуль занят
+  output logic        ser_data_o,      // Serialized data
+  output logic        ser_data_val_o,  // Confirmation of output
+  output logic        busy_o           // Module is busy
 );
 
 logic [3:0] mod_counter;
@@ -22,32 +22,36 @@ always_comb
 always_ff @( posedge clk_i )
   begin
     if ( srst_i )
-      begin
-        mod_counter <= 1'b0;
-        ser_data_val_o <= 1'b0;
-      end
+      mod_counter <= 1'b0;
     else 
       if ( data_val_i )
-        begin
-          mod_counter <= 1'b0;
-          ser_data_val_o <= 1'b1;
-        end 
+        mod_counter <= 1'b0;
     else
       if ( mod_counter == data_mod_i_copy )
-        begin
-          mod_counter <= 1'b0;
-          ser_data_val_o <= 1'b0;
-        end
+        mod_counter <= 1'b0;
     else
       if ( ser_data_val_o )
-        begin
-          mod_counter <= mod_counter + 1;
-          ser_data_val_o <= 1'b1;
-        end 
+        mod_counter <= mod_counter + 1;
   end
 
-  assign ser_data_o = (ser_data_val_o) ? ( data_i[16 - mod_counter - 1] ):
-                                         ( 1'b0                         );
+always_ff @( posedge clk_i )
+  begin
+    if ( srst_i )
+      ser_data_val_o <= 1'b0;
+    else 
+      if ( data_val_i )
+        ser_data_val_o <= 1'b1;
+    else
+      if ( mod_counter == data_mod_i_copy )
+        ser_data_val_o <= 1'b0;
+    else
+      if ( ser_data_val_o )
+        ser_data_val_o <= 1'b1; 
+  end
+
+
+  assign ser_data_o = ( ser_data_val_o ) ? ( data_i[16 - mod_counter - 1] ):
+                                           ( 1'b0                         );
   assign busy_o = data_val_i || ser_data_val_o;
 
 endmodule
