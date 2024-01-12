@@ -18,13 +18,13 @@
 #
 # Quartus Prime
 # Version 18.1.0 Build 625 09/12/2018 SJ Lite Edition
-# Date created = 23:53:24  January 07, 2024
+# Date created = 07:45:00  January 12, 2024
 #
 # -------------------------------------------------------------------------- #
 
 QUARTUS_VERSION = "18.1"
-DATE = "23:53:24  January 07, 2024"
+DATE = "07:45:00  January 12, 2024"
 
 # Revisions
 
-PROJECT_REVISION = "1_1_serializer"
+PROJECT_REVISION = "serializer_top"
