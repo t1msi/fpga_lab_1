@@ -11,27 +11,38 @@ module serializer (
   output logic        busy_o           // Module is busy
 );
 
-logic [3:0] mod_counter;
-logic [3:0] data_mod_i_copy;
+logic [3:0]  mod_counter;
+logic [15:0] data_i_copy;
+logic [3:0]  data_mod_i_copy;
 
-always_comb 
-  if      ( data_mod_i == 0 )                                 data_mod_i_copy = 15;
-  else if ( ( data_mod_i == 1 ) || ( data_mod_i == 2) )       data_mod_i_copy = 0;
-  else                                                        data_mod_i_copy = data_mod_i;
+always_comb
+  begin
+    if (data_val_i)
+      begin
+        case (data_mod_i)
+          0:       data_mod_i_copy = 4'b1111;
+          1:       data_mod_i_copy = 4'b0000;
+          2:       data_mod_i_copy = 4'b0000;
+          default: data_mod_i_copy = data_mod_i;
+        endcase
+  
+        data_i_copy = data_i;
+      end
+  end
 
 always_ff @( posedge clk_i )
   begin
     if ( srst_i )
       mod_counter <= 1'b0;
-    else 
-      if ( data_val_i )
-        mod_counter <= 1'b0;
-    else
-      if ( mod_counter == data_mod_i_copy )
-        mod_counter <= 1'b0;
-    else
-      if ( ser_data_val_o )
-        mod_counter <= mod_counter + 1;
+      else 
+        if ( data_val_i )
+          mod_counter <= 1'b0;
+      else
+        if ( mod_counter == data_mod_i_copy - 1 )
+          mod_counter <= 1'b0;
+      else
+        if ( ser_data_val_o )
+          mod_counter <= mod_counter + 1;
   end
 
 always_ff @( posedge clk_i )
@@ -42,16 +53,15 @@ always_ff @( posedge clk_i )
       if ( data_val_i )
         ser_data_val_o <= 1'b1;
     else
-      if ( mod_counter == data_mod_i_copy )
+      if ( mod_counter == data_mod_i_copy - 1 )
         ser_data_val_o <= 1'b0;
     else
       if ( ser_data_val_o )
         ser_data_val_o <= 1'b1; 
   end
 
-
-  assign ser_data_o = ( ser_data_val_o ) ? ( data_i[16 - mod_counter - 1] ):
+  assign ser_data_o = ( ser_data_val_o ) ? ( data_i_copy[16 - mod_counter - 1] ):
                                            ( 1'b0                         );
-  assign busy_o = data_val_i || ser_data_val_o;
+  assign busy_o = ser_data_val_o;
 
 endmodule

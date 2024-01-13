@@ -44,89 +44,122 @@ task automatic send_data( logic [15:0] _data, logic [3:0] _data_len );
     end
 
   @(posedge clk)
-    ser_data_i_val <= 1'b0;
+    begin
+      data_i_var     <= 16'h0000;
+      data_i_len     <= 4'b0000;
+      ser_data_i_val <= 1'b0; 
+    end
 
 endtask
 
-logic [19:0] test_archive_tmp;
+function void test_report ( logic [19:0] _archive [$] );
+  logic [19:0] test_archive_tmp;
+
+  $display( "[%x errors] %s", _archive.size,
+                            ( _archive.size == 0 ) ? "ALL TESTS PASSED": "THERE ARE ERRORS" );
+    while ( _archive.size > 0 )
+      begin
+        test_archive_tmp = _archive.pop_back;
+        $display( "data = 0x%x len = 0x%x", test_archive_tmp[19:4]
+                                          , test_archive_tmp[3:0] );
+      end
+
+endfunction
 
 initial
 // initialization
   begin
     wait(rst_done);
 
-// recieve data block    
+// data generation block    
     ser_data_i_val = 0;
 
     for ( int i = 0; i <= 4'b1111; i++ )
       for ( int j = 0; j <= 16'hffff; j++ )
         send_data(j, i);
     
-// test report
-    $display( "[%x errors] %s", test_archive.size,
-                              ( test_archive.size == 0 ) ? "ALL TESTS PASSED": "THERE ARE ERRORS" );
-    while ( test_archive.size > 0 )
-      begin
-        test_archive_tmp = test_archive.pop_back;
-        $display( "data = 0x%x len = 0x%x", test_archive_tmp[19:4]
-                                          , test_archive_tmp[3:0] );
-      end
+// test reports
+    $display("Input | Output test report");
+    test_report(test_archive);
+    $display("Collision test report");
+    test_report(collision_archive);     
 
     $stop();
   end
 
-// recieve data block
-logic [3:0] ser_data_counter;
-logic [3:0] data_i_len_copy;
+// data recieve block
+logic [3:0]  ser_data_counter;
+logic [15:0] data_i_tb_copy;
+logic [3:0]  data_i_len_copy;
 
-always_comb begin
-  if ( data_i_len == 0 )
-    data_i_len_copy = 4'b1111;
-  else 
-    if ( ( data_i_len == 1 ) || ( data_i_len == 2 ) )
-      data_i_len_copy = 4'b0000;
-  else
-    data_i_len_copy = data_i_len;
-end
+initial
+  begin
+    forever
+      begin
+        @(posedge clk)
+          begin
+            wait (ser_data_i_val);
+            case (data_i_len)
+              0:       data_i_len_copy = 4'b1111;
+              1:       data_i_len_copy = 4'b0000;
+              2:       data_i_len_copy = 4'b0000;
+              default: data_i_len_copy = data_i_len;
+            endcase
+          
+            data_i_tb_copy = data_i_var;
+          end          
+      end
+  end
 
 initial
   begin
     ser_data_counter = 0;
-  
     forever
       begin
         @(posedge clk);
-          if ( ser_data_val )
-            if ( ser_data_counter == data_i_len_copy )
-              ser_data_counter <= 0;
-            else
-              ser_data_counter <= ser_data_counter + 1;
+        if (ser_data_en)
+          if ( ser_data_counter == data_i_len_copy - 1 )
+            ser_data_counter <= 1'b0;
+          else  
+            ser_data_counter <= ser_data_counter + 1; 
       end
   end
 
 // testing block
 logic        test_bit;
 logic [19:0] test_archive [$];
+logic [19:0] collision_archive [$];
+
+logic        collision_bit;
 
 initial
   begin
     forever
       begin
+        
         @(posedge clk);
-        if ( ser_data_val )
+        collision_bit = 0;
+
+        if( ser_data_en )
           begin
-            test_bit = data_i_var[16 - ser_data_counter - 1] ^ ser_data;
+            collision_bit = ( ( data_i_tb_copy == data_i_var ) || ( data_i_len_copy == data_i_len ) );
+
+            test_bit = ( data_i_tb_copy[16 - ser_data_counter - 1] ^ ser_data );
             
             if ( test_bit )
-              test_archive.push_back( { data_i_var, data_i_len } );
-      
-            $display("%t: data = 0x%x len = 0x%x i = %d data[i] = %x ser_data = %x TEST: %s", $time(),
-                                                                                              data_i_var,
-                                                                                              data_i_len,
-                                                                                              ser_data_counter,
-                                                                                              data_i_var[16 - ser_data_counter - 1],
-                                                                                              ser_data,
-                                                                                              ( !test_bit ) ? "PASSED": "ERROR" );
+              test_archive.push_back( { data_i_tb_copy, data_i_len_copy } );
+
+            if ( collision_bit )
+              collision_archive.push_back( { data_i_tb_copy, data_i_len_copy } );
+
+            $display("%t: data = 0x%x len = 0x%x data[%d] = %x ser_data = %x collision_bit = %x TEST: %s", $time(),
+                                                                                                               data_i_tb_copy,
+                                                                                                               data_i_len_copy,
+                                                                                                               ser_data_counter,
+                                                                                                               data_i_tb_copy[16 - ser_data_counter - 1],
+                                                                                                               ser_data,
+                                                                                                               collision_bit,
+                                                                                                               ( !test_bit ) ? "PASSED": "ERROR" );
           end
       end
   end
