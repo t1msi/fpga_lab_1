@@ -15,7 +15,7 @@ logic [3:0]  mod_counter;
 logic [15:0] data_i_copy;
 logic [3:0]  data_mod_i_copy;
 
-always_comb
+always_ff @( posedge clk_i )
   begin
     if (data_val_i)
       begin
@@ -38,7 +38,7 @@ always_ff @( posedge clk_i )
         if ( data_val_i )
           mod_counter <= 1'b0;
       else
-        if ( mod_counter == data_mod_i_copy - 1 )
+        if ( mod_counter == data_mod_i_copy )
           mod_counter <= 1'b0;
       else
         if ( ser_data_val_o )
@@ -53,7 +53,7 @@ always_ff @( posedge clk_i )
       if ( data_val_i )
         ser_data_val_o <= 1'b1;
     else
-      if ( mod_counter == data_mod_i_copy - 1 )
+      if ( mod_counter == data_mod_i_copy )
         ser_data_val_o <= 1'b0;
     else
       if ( ser_data_val_o )
