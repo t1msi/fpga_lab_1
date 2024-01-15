@@ -1,8 +1,8 @@
 module tb;
 
-bit          clk;
-bit          rst;
-bit          rst_done;
+logic        clk;
+logic        rst;
+logic        rst_done;
 
 logic [15:0] data_i_var;
 logic [3:0]  data_i_len;
@@ -28,6 +28,7 @@ serializer dut (
 );
 
 initial begin
+  clk = 1'b0;
   rst = 1'b1;
   repeat(3) @(posedge clk);
   rst <= 1'b0;
@@ -118,7 +119,7 @@ initial
       begin
         @(posedge clk);
         if (ser_data_en)
-          if ( ser_data_counter == data_i_len_copy - 1 )
+          if ( ser_data_counter == data_i_len_copy )
             ser_data_counter <= 1'b0;
           else  
             ser_data_counter <= ser_data_counter + 1; 

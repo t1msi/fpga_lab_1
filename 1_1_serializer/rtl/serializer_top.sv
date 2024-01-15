@@ -1,6 +1,6 @@
 module serializer_top(
-  input               clk_i,           // Clock signal
-  input               srst_i,          // Syncronous reset
+  input logic         clk_i,           // Clock signal
+  input logic         srst_i,          // Syncronous reset
 	
   input logic [15:0]  data_i,          // Input data
   input logic [3:0]   data_mod_i,      // Quantity of valid bit
@@ -11,7 +11,7 @@ module serializer_top(
   output logic        busy_o           // Module is busy
 );
 
-bit              srst;
+logic            srst;
 
 logic [15:0]     data;
 logic [3:0]      data_mod;
@@ -31,7 +31,7 @@ always_ff @( posedge clk_i )
 
 serializer dut (
   .clk_i               ( clk_i             ),
-  .srst_i              ( srst_             ),
+  .srst_i              ( srst_i             ),
  
   .data_i              ( data_i            ),
   .data_mod_i          ( data_mod_i        ),

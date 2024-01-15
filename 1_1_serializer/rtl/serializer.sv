@@ -1,6 +1,6 @@
 module serializer (
-  input               clk_i,           // Clock signal
-  input               srst_i,          // Syncronous reset
+  input logic         clk_i,           // Clock signal
+  input logic         srst_i,          // Syncronous reset
 	
   input logic [15:0]  data_i,          // Input data
   input logic [3:0]   data_mod_i,      // Quantity of valid bit
@@ -42,7 +42,7 @@ always_ff @( posedge clk_i )
           mod_counter <= 1'b0;
       else
         if ( ser_data_val_o )
-          mod_counter <= mod_counter + 1;
+          mod_counter <= mod_counter + 4'b0001;
   end
 
 always_ff @( posedge clk_i )
