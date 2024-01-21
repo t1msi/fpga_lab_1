@@ -31,22 +31,22 @@ always_ff @( posedge clk_i )
 
 serializer dut (
   .clk_i               ( clk_i             ),
-  .srst_i              ( srst_i             ),
+  .srst_i              ( srst              ),
  
-  .data_i              ( data_i            ),
-  .data_mod_i          ( data_mod_i        ),
-  .data_val_i          ( data_val_i        ),
+  .data_i              ( data              ),
+  .data_mod_i          ( data_mod          ),
+  .data_val_i          ( data_val          ),
 
-  .ser_data_o          ( ser_data_o        ),
-  .ser_data_val_o      ( ser_data_val_o    ),
-  .busy_o              ( busy_o            )
+  .ser_data_o          ( ser_data          ),
+  .ser_data_val_o      ( ser_data_val      ),
+  .busy_o              ( busy            )
 );
 
 always_ff @( posedge clk_i )
   begin
-    ser_data     <= ser_data_o;
-    ser_data_val <= ser_data_val_o;
-    busy         <= busy_o;
+    ser_data_o     <= ser_data;
+    ser_data_val_o <= ser_data_val;
+    busy_o         <= busy;
   end
 
 endmodule
