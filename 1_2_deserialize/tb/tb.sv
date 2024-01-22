@@ -1,18 +1,24 @@
 module tb;
 
-logic        clk;
-logic        rst;
-logic        rst_done;
+localparam DATA_W     = 16;
+localparam TEST_CNT   = 100;
+localparam COUNT_SIZE = $clog2(DATA_W);
 
-logic        data;
-logic        data_val;
+logic              clk;
+logic              rst;
+logic              rst_done;
 
-logic [15:0] deser_data;
-logic        deser_data_val;
+logic              data;
+logic              data_val;
+
+logic [DATA_W-1:0] deser_data;
+logic              deser_data_val;
 
 always #5ns clk = !clk;
 
-deserializer dut (
+deserializer #(
+  .DATA_W              ( DATA_W                )
+) dut (
   .clk_i               ( clk                   ),
   .srst_i              ( rst                   ),
  
@@ -31,8 +37,24 @@ initial begin
   rst_done <= 1'b1;
 end
 
-task automatic send_data( logic [15:0] _data, logic [3:0] _data_len );
-  for (int i = 0; i <= _data_len; i++)
+mailbox #( logic [DATA_W-1:0] ) generated_data = new();
+mailbox #( logic [DATA_W-1:0] ) sended_data    = new();
+mailbox #( logic [DATA_W-1:0] ) read_data      = new();
+
+task gen_data( mailbox #( logic [DATA_W-1:0] ) _data );
+
+logic [DATA_W-1:0] data_to_send;
+
+  for( int i = 0; i < TEST_CNT; i++ )
+    begin
+      data_to_send = $urandom_range(2**DATA_W-1,0);
+      _data.put( data_to_send );
+    end
+
+endtask
+
+task automatic send_data( logic [DATA_W-1:0] _data );
+  for (int i = 0; i <= DATA_W-1; i++)
     @(posedge clk)
       begin
         data     <= _data[i];
@@ -41,75 +63,99 @@ task automatic send_data( logic [15:0] _data, logic [3:0] _data_len );
     
     @(posedge clk)
       data_val <= 1'b0;
-    
+
 endtask
 
-function void test_report ( logic [15:0] _archive [$] );
-  logic [15:0] test_archive_tmp;
+task fifo_wr( mailbox #( logic [DATA_W-1:0] ) _data,
+              mailbox #( logic [DATA_W-1:0] ) sended_data,
+              bit                             burst = 1
+            );
 
-  $display( "[%x errors] %s", _archive.size,
-                            ( _archive.size == 0 ) ? "ALL TESTS PASSED": "THERE ARE ERRORS" );
-    while ( _archive.size > 0 )
-      begin
-        test_archive_tmp = _archive.pop_back;
-        $display( "data = 0x%x", test_archive_tmp[15:0] );
-      end
+  logic [DATA_W-1:0] word_to_wr;
+  int                pause;
+  while( _data.num() )
+    begin
+      _data.get(word_to_wr);
+      if( burst )
+        pause = 0;
+      else
+        pause = $urandom_range(10,0);
 
-endfunction
+      send_data(word_to_wr);
+      sended_data.put( word_to_wr );
 
-logic [15:0] ser_data;
-
-initial
-// initialization
-  begin
-    wait(rst_done);
-
-// data generation block
-    data = '0;
-    data_val = 1'b0;    
-    ser_data = '0;
-
-    for ( int i = 4'b1111; i <= 4'b1111; i++ )
-      for ( int j = 16'h0000; j <= 16'hffff; j = j + 16'h0001 )
+      if( pause != 0 )
         begin
-          send_data(j, i);
-          ser_data <= j;
+          data_val <= 1'b0;
+          repeat(pause) @(posedge clk);
         end
-    
-// test reports
-    $display("Input | Output test report");
-    test_report(test_archive);   
+    end
+  data_val <= 1'b0;
+endtask
 
-    $stop();
-  end
+task fifo_rd( mailbox #( logic [DATA_W-1:0] ) watched_data );
+  while ( watched_data.num() != TEST_CNT )
+    begin
+      @(posedge clk);
+      if ( deser_data_val )
+        watched_data.put( deser_data );
+    end
+endtask
 
-// testing block
-logic        test_bit;
-logic [15:0] test_archive [$];
-logic [15:0] deser_data_reverse;
+task compare_data( mailbox #( logic [DATA_W-1:0] ) ref_data,
+                   mailbox #( logic [DATA_W-1:0] ) dut_data
+                 );
+
+logic [DATA_W-1:0] ref_data_tmp;
+logic [DATA_W-1:0] dut_data_tmp;
+logic [DATA_W-1:0] deser_data_reverse;
+
+  if( ref_data.num() != dut_data.num() )
+    begin
+      $display( "Size of ref data: %d", ref_data.num() );
+      $display( "And sized of dut data: %d", dut_data.num() );
+      $display( "Do not match" );
+      $stop();
+    end
+  else
+    begin
+      for( int i = 0; i < dut_data.num(); i++ )
+        begin
+          dut_data.get( dut_data_tmp );
+          ref_data.get( ref_data_tmp );
+
+          for (int i = 0; i <= DATA_W-1; i++)
+              deser_data_reverse[i] = dut_data_tmp[DATA_W - i - 1];
+
+          if( ref_data_tmp != deser_data_reverse )
+            begin
+              $display( "Error! Data do not match!" );
+              $display( "Reference data: %b", ref_data_tmp );
+              $display( "Read data: %b", dut_data_tmp );
+              $stop();
+            end
+        end
+    end
+
+endtask
 
 initial
   begin
-    test_bit = 0;
-    forever
-      begin
-        @(posedge clk);
-        if( deser_data_val )
-          begin
-            for (int i = 0; i <= 4'b1111; i++)
-              deser_data_reverse[i] = deser_data[16 - i - 1];
-            
-            test_bit = ( ser_data == deser_data_reverse );
+    data     <= '0;
+    data_val <= 1'b0;   
 
-            if ( !test_bit )
-              test_archive.push_back( { ser_data } );
+    gen_data( generated_data );
 
-            $display("%t: ser_data = %b deser_data = %b TEST: %s", $time(),
-                                                                   ser_data,
-                                                                   deser_data,
-                                                                   ( test_bit ) ? "PASSED": "ERROR" );
-          end
-      end
+    wait( rst_done );
+
+    fork
+      fifo_wr(generated_data, sended_data);
+      fifo_rd(read_data);
+    join
+
+    compare_data(sended_data, read_data);
+    $display( "Test done! No errors!" );
+    $stop();
   end
 
 endmodule
