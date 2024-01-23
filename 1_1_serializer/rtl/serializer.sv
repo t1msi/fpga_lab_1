@@ -30,7 +30,7 @@ always_ff @( posedge clk_i )
       end
   end
 
-always_ff @( posedge clk_i or posedge srst_i )
+always_ff @( posedge clk_i )
   begin
     if ( srst_i )
       mod_counter <= 1'b0;
@@ -45,7 +45,7 @@ always_ff @( posedge clk_i or posedge srst_i )
           mod_counter <= mod_counter + 4'b0001;
   end
 
-always_ff @( posedge clk_i or posedge srst_i )
+always_ff @( posedge clk_i )
   begin
     if ( srst_i )
       ser_data_val_o <= 1'b0;
