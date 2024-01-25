@@ -20,10 +20,7 @@ always_ff @( posedge clk_i )
     if ( srst_i )
       mod_counter <= 1'b0;
       else
-        if ( mod_counter == DATA_W-1 )
-          mod_counter <= 1'b0;
-      else 
-        if ( deser_data_val_o )
+        if ( mod_counter == DATA_W-1 && data_val_i )
           mod_counter <= 1'b0;
       else 
         if ( data_val_i )
@@ -34,24 +31,16 @@ always_ff @( posedge clk_i )
   begin
     if ( srst_i )
       deser_data_val_o <= 1'b0;
+      else
+        if ( mod_counter == DATA_W-1 && data_val_i )
+          deser_data_val_o <= 1'b1;
       else 
         if ( deser_data_val_o )
           deser_data_val_o <= 1'b0;
-      else
-        if ( mod_counter == DATA_W-1 )
-          deser_data_val_o <= 1'b1;
   end
 
 always_ff @( posedge clk_i )
-begin
-    if ( srst_i )
-      deser_data_o <= '0;
-      else 
-        if ( deser_data_val_o )
-          deser_data_o <= '0;
-      else 
-        if ( data_val_i )
-          deser_data_o[DATA_W - mod_counter - 1] <= data_i;
-end
+  if ( data_val_i )
+    deser_data_o[DATA_W - mod_counter - 1] <= data_i;
 
 endmodule
