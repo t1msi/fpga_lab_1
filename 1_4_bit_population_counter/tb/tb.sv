@@ -63,6 +63,13 @@ task generate_data( mailbox #( data_s ) _data );
 data_s data_to_send;
 logic [COUNT_SIZE:0] count;
 
+// corner cases
+  _data.put( {(WIDTH)'(0), (COUNT_SIZE + 1)'(0)} );
+  _data.put( {(WIDTH)'(1), (COUNT_SIZE + 1)'(1)} );
+  _data.put( { (WIDTH)'(0) | ((WIDTH)'(1) << WIDTH-1), (COUNT_SIZE + 1)'(1) } );
+  _data.put( { (WIDTH)'(0) | ((WIDTH)'(1) << WIDTH-1) | (WIDTH)'(1), (COUNT_SIZE + 1)'(2) } );
+
+// random test cases
   for( int i = 0; i < TEST_CNT; i++ )
     begin
       data_to_send.gen_data = $urandom_range(GEN_RAND_MAX,GEN_RAND_MIN);
@@ -75,7 +82,6 @@ logic [COUNT_SIZE:0] count;
      data_to_send.test_data = count;
 
       _data.put( data_to_send );
-
     end
 
 endtask
@@ -103,13 +109,14 @@ task fifo_wr( mailbox #( data_s )  _data,
       sended_data.put( data_to_wr );
 
       data_val_in <= 1'b0;
-      repeat(WIDTH + pause) @(posedge clk);
+      wait(data_val_out);
+      repeat(pause + 1) @(posedge clk);
     end
   data_val_in <= 1'b0;
 endtask
 
 task fifo_rd( mailbox #( data_s ) watched_data );
-  while ( watched_data.num() != TEST_CNT )
+  while ( watched_data.num() != TEST_CNT + 4 )
     begin
       @(posedge clk);
       if ( data_val_out )

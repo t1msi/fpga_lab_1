@@ -1,4 +1,4 @@
-localparam WIDTH      = 1024;
+localparam WIDTH      = 16;
 localparam COUNT_SIZE = $clog2(WIDTH);
 
 module bit_population_counter_top(
@@ -42,8 +42,8 @@ bit_population_counter #(
 
 always_ff @( posedge clk_i )
   begin
-    data_out      <= data_o;
-    data_val_out  <= data_val_o;
+    data_o        <= data_out;
+    data_val_o    <= data_val_out;
   end
 
 endmodule
