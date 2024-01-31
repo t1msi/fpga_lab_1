@@ -68,6 +68,19 @@ logic [COUNT_SIZE-1:0] min;
 logic [COUNT_SIZE-1:0] max;
 logic                  min_val;
 
+// corner cases
+    _data.put( {(WIDTH)'(0), (WIDTH)'(0), (WIDTH)'(0)} );
+    _data.put( {(WIDTH)'(1), (WIDTH)'(1), (WIDTH)'(1)} );
+    _data.put( { (WIDTH)'(0) | ((WIDTH)'(1) << WIDTH-1),
+                 (WIDTH)'(0) | ((WIDTH)'(1) << WIDTH-1),
+                 (WIDTH)'(0) | ((WIDTH)'(1) << WIDTH-1) }
+             );
+    _data.put( { (WIDTH)'(0) | ((WIDTH)'(1) << WIDTH-1) | (WIDTH)'(1),
+                 (WIDTH)'(0) | ((WIDTH)'(1) << WIDTH-1),
+                 (WIDTH)'(1) }
+             );
+
+// random test cases
   for( int i = 0; i < TEST_CNT; i++ )
     begin
       data_to_send.gen_data = $urandom_range(GEN_RAND_MAX,GEN_RAND_MIN);
@@ -117,7 +130,8 @@ task fifo_wr( mailbox #( data_s )  _data,
       sended_data.put( data_to_wr );
 
       data_val_in <= 1'b0;
-      repeat(WIDTH + pause) @(posedge clk);
+      wait(data_val_out);
+      repeat(pause + 1) @(posedge clk);
     end
   data_val_in <= 1'b0;
 endtask
