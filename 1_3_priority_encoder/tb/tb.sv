@@ -137,7 +137,7 @@ task fifo_wr( mailbox #( data_s )  _data,
 endtask
 
 task fifo_rd( mailbox #( data_s ) watched_data );
-  while ( watched_data.num() != TEST_CNT )
+  while ( watched_data.num() != TEST_CNT + 4 )
     begin
       @(posedge clk);
       if ( data_val_out )

@@ -66,7 +66,7 @@ logic [COUNT_SIZE:0] count;
 // corner cases
   _data.put( {(WIDTH)'(0), (COUNT_SIZE + 1)'(0)} );
   _data.put( {(WIDTH)'(1), (COUNT_SIZE + 1)'(1)} );
-  _data.put( { (WIDTH)'(0) | ((WIDTH)'(1) << WIDTH-1), (COUNT_SIZE + 1)'(1) } );
+  _data.put( { (WIDTH)'(0) | ((WIDTH)'(1) << WIDTH-1)              , (COUNT_SIZE + 1)'(1) } );
   _data.put( { (WIDTH)'(0) | ((WIDTH)'(1) << WIDTH-1) | (WIDTH)'(1), (COUNT_SIZE + 1)'(2) } );
 
 // random test cases
@@ -76,7 +76,7 @@ logic [COUNT_SIZE:0] count;
       count = 0;
 
       for ( int j = 0; j < WIDTH; j++)
-        if (data_to_send.gen_data[j] == 1'b1)
+        if (data_to_send.gen_data[j] === 1'b1)
           count++;
 
      data_to_send.test_data = count;
