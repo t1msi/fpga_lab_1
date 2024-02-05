@@ -97,14 +97,22 @@ logic                  min_val;
             min_val = 1;
           end
         end
-
-     data_to_send.left  = (WIDTH)'(0) | ((WIDTH)'(1) << max);
-     data_to_send.right = (WIDTH)'(0) | ((WIDTH)'(1) << min);
+     
+      data_to_send.left       = '0;
+      data_to_send.right      = '0;
+      data_to_send.left[max]  = 1'b1;
+      data_to_send.right[min] = 1'b1;
 
       _data.put( data_to_send );
 
     end
 
+endtask
+
+task send_data( logic [WIDTH-1:0] data_to_send );
+  data         <= data_to_send;
+  data_val_in  <= 1'b1;
+  @(posedge clk);
 endtask
 
 task fifo_wr( mailbox #( data_s )  _data,
@@ -122,28 +130,29 @@ task fifo_wr( mailbox #( data_s )  _data,
         pause = 0;
       else
         pause = $urandom_range(SEND_RAND_MAX,SEND_RAND_MIN);
-
-      data         <= data_to_wr.gen_data;
-      data_val_in  <= 1'b1;
-      @(posedge clk);
       
+      send_data(data_to_wr.gen_data);
       sended_data.put( data_to_wr );
-
-      data_val_in <= 1'b0;
-      wait(data_val_out);
-      repeat(pause + 1) @(posedge clk);
+      
+      if (pause)
+        begin
+          data_val_in <= 1'b0;
+          repeat(pause) @(posedge clk);
+        end
     end
   data_val_in <= 1'b0;
+endtask
+
+task check_data( mailbox #( data_s ) watched_data );
+  if ( data_val_out )
+    watched_data.put( { data, data_left, data_right } );
 endtask
 
 task fifo_rd( mailbox #( data_s ) watched_data );
   while ( watched_data.num() != TEST_CNT + 4 )
     begin
       @(posedge clk);
-      if ( data_val_out )
-        begin
-          watched_data.put( { data, data_left, data_right } );
-        end
+      check_data(watched_data);
     end
 endtask
 
