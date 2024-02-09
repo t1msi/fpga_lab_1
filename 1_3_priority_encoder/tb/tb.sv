@@ -10,6 +10,8 @@ localparam GEN_RAND_MAX   = 2**WIDTH - 1;
 localparam SEND_RAND_MIN  = 0;
 localparam SEND_RAND_MAX  = WIDTH - 1;
 
+localparam BURST_MODE     = 1;
+
 localparam INIT_RST_DUR   = 3;
 
 logic              clk;
@@ -144,17 +146,23 @@ task fifo_wr( mailbox #( data_s )  _data,
 endtask
 
 task check_data( mailbox #( data_s ) watched_data );
+  data_s data_to_rd;
   if ( data_val_out )
-    watched_data.put( { data, data_left, data_right } );
+    begin
+      data_to_rd = { '0, data_left, data_right };
+      watched_data.put( data_to_rd );
+    end
 endtask
 
 task fifo_rd( mailbox #( data_s ) watched_data );
   while ( watched_data.num() != TEST_CNT + 4 )
     begin
-      @(posedge clk);
       check_data(watched_data);
+      @(posedge clk);
     end
 endtask
+
+// @TODO: compare_latency (COMB, SEQ with modes, PIPE, with modes)
 
 task compare_data( mailbox #( data_s ) ref_data,
                    mailbox #( data_s ) dut_data
@@ -180,9 +188,10 @@ task compare_data( mailbox #( data_s ) ref_data,
           if( ( ref_data_tmp.left != dut_data_tmp.left ) || ( ref_data_tmp.right != dut_data_tmp.right ) )
             begin
               $display( "Error! Data do not match!" );
-              $display( "Reference data: %b %b", ref_data_tmp.gen_data, dut_data_tmp.gen_data);
-              $display( "Gen data: left = %b, right = %b", ref_data_tmp.left, ref_data_tmp.right );
-              $display( "Read data: left = %b, right = %b", dut_data_tmp.left, dut_data_tmp.right );
+              $display( "Reference num = %d", TEST_CNT + 4 - dut_data.num() );
+              $display( "Reference data: %x   = %b" , ref_data_tmp.gen_data, ref_data_tmp.gen_data);
+              $display( "Gen data:       left = %b, right = %b", ref_data_tmp.left, ref_data_tmp.right );
+              $display( "Read data:      left = %b, right = %b", dut_data_tmp.left, dut_data_tmp.right );
               $stop();
             end
         end
@@ -200,7 +209,7 @@ initial
     wait( rst_done );
 
     fork
-      fifo_wr(generated_data, sended_data, 0);
+      fifo_wr(generated_data, sended_data, BURST_MODE);
       fifo_rd(read_data);
     join
 
