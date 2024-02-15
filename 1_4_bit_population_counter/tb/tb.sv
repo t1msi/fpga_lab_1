@@ -10,6 +10,8 @@ localparam GEN_RAND_MAX   = 2**WIDTH - 1;
 localparam SEND_RAND_MIN  = 0;
 localparam SEND_RAND_MAX  = WIDTH - 1;
 
+localparam BURST_MODE     = 1;
+
 localparam INIT_RST_DUR   = 3;
 
 logic                 clk;
@@ -86,6 +88,12 @@ logic [COUNT_SIZE:0] count;
 
 endtask
 
+task send_data( logic [WIDTH-1:0] data_to_send );
+  data         <= data_to_send;
+  data_val_in  <= 1'b1;
+  @(posedge clk);
+endtask
+
 task fifo_wr( mailbox #( data_s )  _data,
               mailbox #( data_s )  sended_data,
               bit                  burst = 1
@@ -102,27 +110,32 @@ task fifo_wr( mailbox #( data_s )  _data,
       else
         pause = $urandom_range(SEND_RAND_MAX,SEND_RAND_MIN);
 
-      data         <= data_to_wr.gen_data;
-      data_val_in  <= 1'b1;
-      @(posedge clk);
-      
+      send_data(data_to_wr.gen_data);
       sended_data.put( data_to_wr );
 
-      data_val_in <= 1'b0;
-      wait(data_val_out);
-      repeat(pause + 1) @(posedge clk);
+      if (pause)
+        begin
+          data_val_in <= 1'b0;
+          repeat(pause) @(posedge clk);
+        end
     end
   data_val_in <= 1'b0;
+endtask
+
+task check_data( mailbox #( data_s ) watched_data );
+  data_s data_to_rd;
+  if ( data_val_out )
+    begin
+      data_to_rd = { data, data_out };
+      watched_data.put( data_to_rd );
+    end
 endtask
 
 task fifo_rd( mailbox #( data_s ) watched_data );
   while ( watched_data.num() != TEST_CNT + 4 )
     begin
+      check_data(watched_data);
       @(posedge clk);
-      if ( data_val_out )
-        begin
-          watched_data.put( { data, data_out } );
-        end
     end
 endtask
 
@@ -150,9 +163,10 @@ task compare_data( mailbox #( data_s ) ref_data,
           if( ref_data_tmp.test_data != dut_data_tmp.test_data )
             begin
               $display( "Error! Data do not match!" );
+              $display( "Reference num = %d", TEST_CNT + 4 - dut_data.num() );
               $display( "Reference data: %b %d", ref_data_tmp.gen_data, ref_data_tmp.test_data);
               $display( "Read data       %b %d", dut_data_tmp.gen_data, dut_data_tmp.test_data);
-              // $stop();
+              $stop();
             end
         end
     end
@@ -169,7 +183,7 @@ initial
     wait( rst_done );
 
     fork
-      fifo_wr(generated_data, sended_data);
+      fifo_wr(generated_data, sended_data, BURST_MODE);
       fifo_rd(read_data);
     join
 
