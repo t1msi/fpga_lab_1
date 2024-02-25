@@ -94,14 +94,6 @@ always_comb
             case ( cmd_type_i )
               SHUTDOWN_CMD :  next_mode = IDLE_M;
               NORMAL_CMD   :  next_mode = NORMAL_M;
-              
-              SET_GREEN_CMD : time_entity.green_time  = ( cmd_data_i )
-                                                      ? cmd_data_i : (WIDTH)'(1);
-              SET_RED_CMD   : time_entity.red_time    = ( cmd_data_i )
-                                                      ? cmd_data_i : (WIDTH)'(1);
-              SET_YELLOW_CMD: time_entity.yellow_time = ( cmd_data_i )
-                                                      ? cmd_data_i : (WIDTH)'(1);
-                 
               default:        next_mode = NOTRANSITION_M;
             endcase
         end
@@ -118,6 +110,25 @@ always_ff @( posedge clk_i )
     mode <= IDLE_M;
     else 
       mode <= next_mode;
+
+// Assign time_data for green, red, yellow
+
+always_ff @( posedge clk_i )
+  if ( srst_i )
+    begin
+      time_entity.green_time  <= '0;
+      time_entity.red_time    <= '0;
+      time_entity.yellow_time <= '0;
+    end
+    else
+      if( cmd_valid_i && mode == NOTRANSITION_M )
+        begin
+          case ( cmd_type_i )
+            SET_GREEN_CMD : time_entity.green_time  <= ( cmd_data_i ) ? cmd_data_i : (WIDTH)'(1);
+            SET_RED_CMD   : time_entity.red_time    <= ( cmd_data_i ) ? cmd_data_i : (WIDTH)'(1);
+            SET_YELLOW_CMD: time_entity.yellow_time <= ( cmd_data_i ) ? cmd_data_i : (WIDTH)'(1);
+          endcase
+        end
 
 
 // Switch states | BY COMMANDS + in NORMAL_M
@@ -224,8 +235,6 @@ always_ff @ ( posedge clk_i )
           
             RED_YELLOW_S:
               begin
-                red_o    <= 1'b1;
-                green_o  <= 1'b0;
                 yellow_o <= 1'b1;
               end
         
@@ -238,22 +247,17 @@ always_ff @ ( posedge clk_i )
             
             GREEN_BLINK_S:             // On the 1st clk_i is already green 
               begin
-                red_o    <= 1'b0;
                 if ( counter_half_period == BLINK_HALF_PERIOD_MS - 1 ) green_o <= ~green_o; // лишний такт горит
-                yellow_o <= 1'b0;
               end
       
             YELLOW_S:
               begin
-                red_o    <= 1'b0;
                 green_o  <= 1'b0;
                 yellow_o <= 1'b1;
               end
             
             YELLOW_BLINK_S: 
               begin
-                red_o    <= 1'b0;
-                green_o  <= 1'b0;
                 if ( counter_half_period == BLINK_HALF_PERIOD_MS - 1 ) yellow_o <= ~yellow_o;
               end
             default:

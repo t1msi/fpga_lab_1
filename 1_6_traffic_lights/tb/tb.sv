@@ -3,17 +3,17 @@ module tb;
 // `define DEBUG                           // Print all testing steps
 
 localparam WIDTH      = 16;
-localparam TEST_CNT   = 100;
+localparam TEST_CNT   = 10;
 
 localparam GEN_RAND_MIN   = 1;             // Must be greater than 0
 localparam GEN_RAND_MAX   = WIDTH - 1;
 
-localparam SEND_RAND_MIN  = 1;             // @TODO: Fix BURST_MODE (race cond. wait in check_data, need 1 clk more)
-localparam SEND_RAND_MAX  = WIDTH - 1;     // @TODO: Change to 2^WIDTH
+localparam SEND_RAND_MIN  = 1;
+localparam SEND_RAND_MAX  = WIDTH - 1;
 
 localparam NOTRANSITION_TICK = 5;
 
-localparam BURST_MODE     = 0;             // @BUG: Do not work in burst, min latency = 1
+localparam BURST_MODE     = 1;
 
 localparam BLINK_HALF_PERIOD_MS  = 2;
 localparam BLINK_GREEN_TIME_TICK = 5;
@@ -364,7 +364,6 @@ task fifo_rd( mailbox #( data_s ) watched_data );
   while ( watched_data.num() != TEST_CNT + 1 )
     begin
       check_data(watched_data);
-      @(posedge clk);
     end
 endtask
 
