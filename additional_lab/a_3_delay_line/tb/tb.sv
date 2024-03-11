@@ -3,22 +3,20 @@ module tb;
 // `define DEBUG                           // Print all testing steps
 
 localparam WIDTH          = 4;
-localparam COUNT_SIZE     = $clog2(WIDTH);
+localparam DATA_WIDTH     = 16;
 
-localparam TEST_CNT       = 1000;
+localparam TEST_CNT       = 100;
 
-localparam GEN_RAND_MIN   = 1;
-localparam GEN_RAND_MAX   = 2**WIDTH - 1;
+localparam GEN_RAND_MIN   = 0;
+localparam GEN_RAND_MAX   = 2**DATA_WIDTH - 1;
 
 localparam SEND_RAND_MIN  = 0;
-localparam SEND_RAND_MAX  = WIDTH - 1;
+localparam SEND_RAND_MAX  = 2**WIDTH - 1;
 
 localparam BURST_MODE     = 1;
 
 
-logic              clk;
-// logic              rst;
-// logic              rst_done;
+logic                clk;
 
 logic                data_in;
 logic [WIDTH-1:0]    data_delay_in;
@@ -35,8 +33,11 @@ delay_15 dut (
 );
 
 typedef struct packed {
-  logic [WIDTH-1:0] gen_data;
-  logic [WIDTH-1:0] test_delay;
+  logic [DATA_WIDTH-1:0] gen_data;
+  logic [WIDTH-1:0]      gen_delay;
+
+  logic [DATA_WIDTH-1:0] test_data;  
+  logic [WIDTH-1:0]      test_delay;
 } data_s;
 
 mailbox #( data_s ) generated_data  = new();
@@ -44,7 +45,6 @@ mailbox #( data_s ) sended_data     = new();
 mailbox #( data_s ) read_data       = new();
 
 data_s              test_data;                   // @TODO: Remove global
-logic [WIDTH-1:0]   iter_inner;
 
 task generate_data( mailbox #( data_s ) _data );
 
@@ -53,7 +53,11 @@ data_s data_to_send;
 // random test cases
   for( int i = 0; i < TEST_CNT; i++ )
     begin
-      data_to_send.gen_data = $urandom_range(GEN_RAND_MAX,GEN_RAND_MIN);
+      data_to_send.gen_data  = $urandom_range(GEN_RAND_MAX,GEN_RAND_MIN);
+      data_to_send.gen_delay = $urandom_range(SEND_RAND_MAX,SEND_RAND_MIN);
+      
+      data_to_send.test_data  = '0;
+      data_to_send.test_delay = '0;
 
       _data.put( data_to_send );
     end
@@ -61,13 +65,16 @@ data_s data_to_send;
 endtask
 
 task send_data( data_s data_to_send );
-  data_in            = 1'b1;
-  data_delay_in      = data_to_send.gen_data;
+  data_delay_in      = data_to_send.gen_delay;
 
-  @(posedge clk);
-  data_in = 1'b0;
+  for (int i = 0; i < DATA_WIDTH; i++) 
+    begin
+      data_in = data_to_send.gen_data[i];
+      @(posedge clk);
+    end
 
-  repeat(2**WIDTH-1) @(posedge clk);
+  data_in = '0;
+  repeat(data_to_send.gen_delay + 1) @(posedge clk);
 endtask
 
 task fifo_wr( mailbox #( data_s )  _data,
@@ -87,16 +94,14 @@ task fifo_wr( mailbox #( data_s )  _data,
       else
         pause = $urandom_range(SEND_RAND_MAX,SEND_RAND_MIN);
 
-      sended_data.put( data_to_wr );
-
-      test_data             = data_to_wr;
-      test_data.test_delay  = '0;             // Link with "check_data"
+      test_data = data_to_wr;
 
       send_data(data_to_wr);
-      
+      sended_data.put( data_to_wr );
+
       if ( pause )
         begin
-          data_delay_in = '0;
+          // data_delay_in = '0;
           repeat(pause) @(posedge clk);
         end
       
@@ -104,23 +109,41 @@ task fifo_wr( mailbox #( data_s )  _data,
     data_delay_in = '0;
 endtask
 
-task check_data( mailbox #( data_s ) watched_data );
-
-  if ( data_out )
-    begin
-      test_data.test_delay = iter_inner;
-      watched_data.put( test_data );
-    end
-
-endtask
-
 task fifo_rd( mailbox #( data_s ) watched_data );
+
+  logic [DATA_WIDTH:0]   iter_inner;
+  logic [DATA_WIDTH:0]   iter_ex;
+
   while ( watched_data.num() != TEST_CNT )
     begin
-      if ( iter_inner === 2**WIDTH - 1 ) iter_inner = '0;
-      check_data(watched_data);
+      iter_inner = 0;
+      iter_ex    = 0;
+      do                                                          // Пропуск delay тактов
+        begin
+          @(posedge clk);                                         // Смена старого значения test_data
+          iter_inner++;
+          iter_ex++;
+        end
+      while (iter_inner < test_data.gen_delay);
+
+      if ( test_data.gen_delay )
+        begin
+          test_data.test_delay = iter_inner;
+          iter_inner = 0;
+        end
+      else
+        begin                                                     // delay = 0
+          test_data.test_data[0] = data_out;
+        end
+
+      for ( ; iter_inner < DATA_WIDTH; iter_inner++, iter_ex++ )  // Получение обратного сигнала
+        begin
+          @(posedge clk);
+          test_data.test_data[iter_inner] = data_out;
+        end
+        
+      watched_data.put( test_data );                              // Запись в mailbox
       @(posedge clk);
-      iter_inner++;
     end
 endtask
 
@@ -145,12 +168,14 @@ task compare_data( mailbox #( data_s ) ref_data,
           dut_data.get( dut_data_tmp );
           ref_data.get( ref_data_tmp );
 
-          if( ref_data_tmp.gen_data != dut_data_tmp.test_delay )
+          if( ref_data_tmp.gen_delay != dut_data_tmp.test_delay || ref_data_tmp.gen_data != dut_data_tmp.test_data )
             begin
               $display( "Error! Data do not match!" );
               $display( "Reference num = %d", TEST_CNT - dut_data.num() );
-              $display( "Gen data:       gen = %d, test = %d", ref_data_tmp.gen_data, ref_data_tmp.test_delay );
-              $display( "Read data:      gen = %d, test = %d", dut_data_tmp.gen_data, dut_data_tmp.test_delay );
+              $display( "Gen data:       data = %b, delay = %x", ref_data_tmp.gen_data, ref_data_tmp.gen_delay );
+              $display( "Read data:      data = %b, delay = %x : %b %x" , dut_data_tmp.test_data, dut_data_tmp.test_delay
+                                                                        , dut_data_tmp.gen_data, dut_data_tmp.gen_delay
+                      );
               `ifdef DEBUG
               `else
               $stop();
